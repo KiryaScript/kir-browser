@@ -7,8 +7,6 @@ from PyQt5.QtGui import QIcon, QPalette, QColor
 from settings_dialog import SettingsDialog
 from urllib.parse import quote, urlparse
 
-from urllib.parse import quote, urlparse
-
 def navigate(self):
     query = self.url_bar.text()
     
