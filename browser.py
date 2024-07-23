@@ -1,49 +1,18 @@
-import sys
 from PyQt5.QtCore import QUrl, Qt
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
-                             QProgressBar, QMenu, QAction, QColorDialog, QFileDialog, QComboBox, QLabel, QDialog)
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
+                             QProgressBar)
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings
 from PyQt5.QtGui import QIcon, QPalette, QColor
-
-class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Settings")
-        self.layout = QVBoxLayout()
-
-        # Color picker
-        self.color_btn = QPushButton("Choose background color")
-        self.color_btn.clicked.connect(self.choose_color)
-        self.layout.addWidget(self.color_btn)
-
-        # Icon picker
-        self.icon_btn = QPushButton("Choose icon")
-        self.icon_btn.clicked.connect(self.choose_icon)
-        self.layout.addWidget(self.icon_btn)
-
-        # Search engine selector
-        self.search_label = QLabel("Default search engine:")
-        self.search_combo = QComboBox()
-        self.search_combo.addItems(["Google", "Bing", "DuckDuckGo"])
-        self.search_combo.currentTextChanged.connect(self.parent().set_search_engine)
-        self.layout.addWidget(self.search_label)
-        self.layout.addWidget(self.search_combo)
-
-        self.setLayout(self.layout)
-
-    def choose_color(self):
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.parent().set_background_color(color)
-
-    def choose_icon(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Select Icon", "", "Image Files (*.png *.jpg *.bmp)")
-        if filename:
-            self.parent().set_icon(filename)
+from settings_dialog import SettingsDialog
+import os
 
 class SimpleBrowser(QWidget):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
+        self.config = config
+        self.init_ui()
+
+    def init_ui(self):
         self.setWindowTitle('Simple Browser')
         self.setGeometry(100, 100, 1024, 768)
 
@@ -63,9 +32,15 @@ class SimpleBrowser(QWidget):
         go_btn = QPushButton('Go')
         go_btn.clicked.connect(self.navigate)
 
+        back_btn = QPushButton('Back')
+        back_btn.clicked.connect(self.go_back)
+
         settings_btn = QPushButton('Settings')
         settings_btn.clicked.connect(self.open_settings)
 
+        toolbar.addWidget(back_btn)
+        toolbar.addWidget(self.url_bar)
+        toolbar.addWidget(back_btn)
         toolbar.addWidget(self.url_bar)
         toolbar.addWidget(go_btn)
         toolbar.addWidget(settings_btn)
@@ -79,17 +54,33 @@ class SimpleBrowser(QWidget):
 
         self.setLayout(self.layout)
 
-        self.search_engines = {
-            "Google": "https://www.google.com/search?q=",
-            "Bing": "https://www.bing.com/search?q=",
-            "DuckDuckGo": "https://duckduckgo.com/?q="
-        }
-        self.current_search_engine = "Google"
+        self.search_engines = self.config.get('search_engines')
+        self.current_search_engine = self.config.get('default_search_engine')
 
+        # Set custom user agent for better YouTube compatibility
+        self.profile = QWebEngineProfile.defaultProfile()
+        self.profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+        # Set persistent storage path for cookies, cache, etc.
+        self.profile.setPersistentStoragePath('./browser_data')
+
+        self.apply_saved_settings()
         self.add_tab()
+
+    def apply_saved_settings(self):
+        color = self.config.get('background_color')
+        if color:
+            self.set_background_color(QColor(color))
+        
+        icon_path = self.config.get('icon_path')
+        if icon_path and os.path.exists(icon_path):
+            self.set_icon(icon_path)
 
     def add_tab(self, url=""):
         new_tab = QWebEngineView()
+        new_tab.settings().setAttribute(QWebEngineSettings.PluginsEnabled, True)
+        new_tab.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+        
         index = self.tabs.addTab(new_tab, "New Tab")
         self.tabs.setCurrentIndex(index)
         new_tab.urlChanged.connect(lambda qurl, browser=new_tab: self.update_url(qurl, browser))
@@ -109,7 +100,7 @@ class SimpleBrowser(QWidget):
         if query.startswith(('http://', 'https://')):
             url = query
         else:
-            url = self.search_engines[self.current_search_engine] + query
+            url = self.search_engines[self.current_search_engine].format(query)
         self.tabs.currentWidget().setUrl(QUrl(url))
 
     def update_url(self, q, browser):
@@ -124,25 +115,27 @@ class SimpleBrowser(QWidget):
         self.tabs.setTabText(index, title)
 
     def open_settings(self):
-        settings = SettingsDialog(self)
+        settings = SettingsDialog(self, self.config)
         settings.exec_()
 
     def set_background_color(self, color):
         palette = self.palette()
         palette.setColor(QPalette.Window, color)
         self.setPalette(palette)
+        self.config.set('background_color', color.name())
 
     def set_icon(self, filename):
         self.setWindowIcon(QIcon(filename))
+        self.config.set('icon_path', filename)
 
     def set_search_engine(self, engine):
         self.current_search_engine = engine
+        self.config.set('default_search_engine', engine)
 
-def main():
-    app = QApplication(sys.argv)
-    window = SimpleBrowser()
-    window.show()
-    sys.exit(app.exec_())
+    def add_search_engine(self, name, url):
+        self.search_engines[name] = url
+        self.config.set('search_engines', self.search_engines)
 
-if __name__ == '__main__':
-    main()
+    def go_back(self):
+        if self.tabs.currentWidget().history().canGoBack():
+            self.tabs.currentWidget().back()
