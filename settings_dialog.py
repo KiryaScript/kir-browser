@@ -1,6 +1,8 @@
+import pyaudio
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QLabel, 
                              QListWidget, QInputDialog, QColorDialog, QFileDialog, QTabWidget, QWidget)
 from PyQt5.QtCore import Qt
+from PyQt5.QtWebEngineWidgets import QWebEngineSettings
 
 class SettingsDialog(QDialog):
     def __init__(self, parent, config):
@@ -14,10 +16,57 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget()
 
         self.init_general_tab()
+        self.init_audio_tab()
         self.init_extensions_tab()
 
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
+
+    def init_audio_tab(self):
+        audio_tab = QWidget()
+        audio_layout = QVBoxLayout()
+
+        # Output devices
+        self.output_label = QLabel("Output Device:")
+        self.output_combo = QComboBox()
+        self.fill_audio_devices(self.output_combo, 'output')
+        self.output_combo.currentIndexChanged.connect(self.change_output_device)
+        audio_layout.addWidget(self.output_label)
+        audio_layout.addWidget(self.output_combo)
+
+        # Input devices
+        self.input_label = QLabel("Input Device:")
+        self.input_combo = QComboBox()
+        self.fill_audio_devices(self.input_combo, 'input')
+        self.input_combo.currentIndexChanged.connect(self.change_input_device)
+        audio_layout.addWidget(self.input_label)
+        audio_layout.addWidget(self.input_combo)
+
+        audio_tab.setLayout(audio_layout)
+        self.tabs.addTab(audio_tab, "Audio")
+
+    def fill_audio_devices(self, combo, device_type):
+        p = pyaudio.PyAudio()
+        default_device = p.get_default_host_api_info()['defaultOutputDevice' if device_type == 'output' else 'defaultInputDevice']
+        for i in range(p.get_device_count()):
+            dev = p.get_device_info_by_index(i)
+            if (device_type == 'output' and dev['maxOutputChannels'] > 0) or \
+               (device_type == 'input' and dev['maxInputChannels'] > 0):
+                combo.addItem(dev['name'], dev['index'])
+                if dev['index'] == default_device:
+                    combo.setCurrentIndex(combo.count() - 1)
+        p.terminate()
+
+    def change_output_device(self, index):
+        device_index = self.output_combo.currentData()
+        self.config.set('audio_output_device', device_index)
+        QWebEngineSettings.globalSettings().setAttribute(QWebEngineSettings.PlaybackRequiresUserGesture, False)
+        # Note: Setting the actual audio device requires lower-level audio API integration
+
+    def change_input_device(self, index):
+        device_index = self.input_combo.currentData()
+        self.config.set('audio_input_device', device_index)
+        # Note: Setting the actual audio device requires lower-level audio API integration
 
     def init_general_tab(self):
         general_tab = QWidget()
@@ -36,8 +85,13 @@ class SettingsDialog(QDialog):
         # Search engine selector
         self.search_label = QLabel("Default search engine:")
         self.search_combo = QComboBox()
-        self.search_combo.addItems(list(self.parent.search_engines.keys()))
-        self.search_combo.setCurrentText(self.parent.current_search_engine)
+        
+        if hasattr(self.parent, 'search_engines') and self.parent.search_engines is not None:
+            self.search_combo.addItems(list(self.parent.search_engines.keys()))
+        else:
+            default_engines = ["Google", "Bing", "DuckDuckGo"]
+            self.search_combo.addItems(default_engines)
+        
         self.search_combo.currentTextChanged.connect(self.parent.set_search_engine)
         general_layout.addWidget(self.search_label)
         general_layout.addWidget(self.search_combo)
@@ -56,12 +110,12 @@ class SettingsDialog(QDialog):
         self.extensions_list = QListWidget()
         extensions_layout.addWidget(self.extensions_list)
         
-        add_extension_btn = QPushButton("Add Extension")
+        add_extension_btn = QPushButton("Добавить расширение")
         add_extension_btn.clicked.connect(self.add_extension)
         extensions_layout.addWidget(add_extension_btn)
 
         extensions_tab.setLayout(extensions_layout)
-        self.tabs.addTab(extensions_tab, "Extensions")
+        self.tabs.addTab(extensions_tab, "Расширения")
 
     def choose_color(self):
         color = QColorDialog.getColor()
@@ -69,21 +123,21 @@ class SettingsDialog(QDialog):
             self.parent.set_background_color(color)
 
     def choose_icon(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Select Icon", "", "Image Files (*.png *.jpg *.bmp)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Выбор иконки", "", "Image Files (*.png *.jpg *.bmp)")
         if filename:
             self.parent.set_icon(filename)
 
     def add_search_engine(self):
-        name, ok = QInputDialog.getText(self, "Add Search Engine", "Enter search engine name:")
+        name, ok = QInputDialog.getText(self, "Добавить поисковую систему", "Введите поисковую систему:")
         if ok and name:
-            url, ok = QInputDialog.getText(self, "Add Search Engine", "Enter search URL (use {} for query):")
+            url, ok = QInputDialog.getText(self, "Добавить поисковую систему", "Введите URL адрес системы (use {} for query):")
             if ok and url:
                 self.parent.add_search_engine(name, url)
                 self.search_combo.addItem(name)
 
     def add_extension(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Select Extension", "", "CRX Files (*.crx)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Выбрать расширение", "", "CRX Files (*.crx)")
         if filename:
-            # Здесь вы бы реализовали логику для добавления и включения расширения
-            # Это заглушка, так как реализация поддержки расширений браузера - сложная задача
+            # Здесь я бы реализовал логику для добавления и включения расширения
+            # Это заглушка, так как реализация поддержки расширений браузера - пиздец сложная задача
             self.extensions_list.addItem(filename)

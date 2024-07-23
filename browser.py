@@ -1,19 +1,48 @@
+import os
 from PyQt5.QtCore import QUrl, Qt
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
                              QProgressBar)
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings, QWebEnginePage
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from settings_dialog import SettingsDialog
-import os
+from urllib.parse import quote, urlparse
+
+from urllib.parse import quote, urlparse
+
+def navigate(self):
+    query = self.url_bar.text()
+    
+    
+    parsed = urlparse(query)
+    if parsed.scheme and parsed.netloc:
+        url = query
+    else:
+        
+        if ' ' in query:
+            
+            encoded_query = quote(query)
+            url = self.search_engines[self.current_search_engine].format(encoded_query)
+        else:
+            
+            url = 'http://' + quote(query)
+
+    self.tabs.currentWidget().setUrl(QUrl(url))
 
 class SimpleBrowser(QWidget):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.profile = QWebEngineProfile.defaultProfile()
+        self.search_engines = self.config.get('search_engines', {
+            "Google": "https://www.google.com/search?q={}",
+            "Bing": "https://www.bing.com/search?q={}",
+            "DuckDuckGo": "https://duckduckgo.com/?q={}"
+        })
+        self.current_search_engine = self.config.get('default_search_engine', "Google")
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Simple Browser')
+        self.setWindowTitle('Kir-Browser')
         self.setGeometry(100, 100, 1024, 768)
 
         self.layout = QVBoxLayout()
@@ -29,17 +58,15 @@ class SimpleBrowser(QWidget):
 
         self.url_bar = QLineEdit()
         self.url_bar.setPlaceholderText('Enter URL or search query')
-        go_btn = QPushButton('Go')
+        go_btn = QPushButton('Поиск')
         go_btn.clicked.connect(self.navigate)
 
-        back_btn = QPushButton('Back')
+        back_btn = QPushButton('Назад')
         back_btn.clicked.connect(self.go_back)
 
-        settings_btn = QPushButton('Settings')
+        settings_btn = QPushButton('Настройки')
         settings_btn.clicked.connect(self.open_settings)
 
-        toolbar.addWidget(back_btn)
-        toolbar.addWidget(self.url_bar)
         toolbar.addWidget(back_btn)
         toolbar.addWidget(self.url_bar)
         toolbar.addWidget(go_btn)
@@ -54,40 +81,33 @@ class SimpleBrowser(QWidget):
 
         self.setLayout(self.layout)
 
-        self.search_engines = self.config.get('search_engines')
+        self.search_engines = self.config.get('Поисковая система по умолчанию')
         self.current_search_engine = self.config.get('default_search_engine')
 
-        # Set custom user agent for better YouTube compatibility
-        self.profile = QWebEngineProfile.defaultProfile()
+        # тут можно замаскировать браузер\систему под другой любой
         self.profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-        # Set persistent storage path for cookies, cache, etc.
-        self.profile.setPersistentStoragePath('./browser_data')
+        
+        self.profile.setPersistentStoragePath(os.path.join(os.getcwd(), 'browser_data'))
 
         self.apply_saved_settings()
         self.add_tab()
 
-    def apply_saved_settings(self):
-        color = self.config.get('background_color')
-        if color:
-            self.set_background_color(QColor(color))
-        
-        icon_path = self.config.get('icon_path')
-        if icon_path and os.path.exists(icon_path):
-            self.set_icon(icon_path)
-
     def add_tab(self, url=""):
         new_tab = QWebEngineView()
+        new_tab.setPage(QWebEnginePage(self.profile, new_tab))
         new_tab.settings().setAttribute(QWebEngineSettings.PluginsEnabled, True)
         new_tab.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
         
-        index = self.tabs.addTab(new_tab, "New Tab")
+        index = self.tabs.addTab(new_tab, "Новая")
         self.tabs.setCurrentIndex(index)
         new_tab.urlChanged.connect(lambda qurl, browser=new_tab: self.update_url(qurl, browser))
         new_tab.loadProgress.connect(self.update_progress)
         new_tab.loadFinished.connect(lambda _, index=index, browser=new_tab: self.update_tab_title(index, browser))
         if url:
             new_tab.setUrl(QUrl(url))
+        else:
+            new_tab.setUrl(QUrl("https://www.google.com"))
 
     def close_tab(self, index):
         if self.tabs.count() > 1:
@@ -97,10 +117,13 @@ class SimpleBrowser(QWidget):
 
     def navigate(self):
         query = self.url_bar.text()
-        if query.startswith(('http://', 'https://')):
-            url = query
+        if not query.startswith(('http://', 'https://')):
+            if ' ' in query:  # If there's a space, assume it's a search query
+                url = self.search_engines[self.current_search_engine].format(query)
+            else:
+                url = 'http://' + query
         else:
-            url = self.search_engines[self.current_search_engine].format(query)
+            url = query
         self.tabs.currentWidget().setUrl(QUrl(url))
 
     def update_url(self, q, browser):
@@ -139,3 +162,12 @@ class SimpleBrowser(QWidget):
     def go_back(self):
         if self.tabs.currentWidget().history().canGoBack():
             self.tabs.currentWidget().back()
+
+    def apply_saved_settings(self):
+        color = self.config.get('background_color')
+        if color:
+            self.set_background_color(QColor(color))
+        
+        icon_path = self.config.get('icon_path')
+        if icon_path and os.path.exists(icon_path):
+            self.set_icon(icon_path)
