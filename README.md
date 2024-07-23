@@ -1,0 +1,1 @@
+beta test kir-browser
