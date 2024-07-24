@@ -1,0 +1,10 @@
+{
+    "search_engines": {
+        "Google": "https://www.google.com/search?q={}",
+        "Bing": "https://www.bing.com/search?q={}",
+        "DuckDuckGo": "https://duckduckgo.com/?q={}"
+    },
+    "default_search_engine": "Google",
+    "background_color": "#ffffff",
+    "icon_path": ""
+}

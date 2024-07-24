@@ -16,57 +16,10 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget()
 
         self.init_general_tab()
-        self.init_audio_tab()
         self.init_extensions_tab()
 
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
-
-    def init_audio_tab(self):
-        audio_tab = QWidget()
-        audio_layout = QVBoxLayout()
-
-        # Output devices
-        self.output_label = QLabel("Output Device:")
-        self.output_combo = QComboBox()
-        self.fill_audio_devices(self.output_combo, 'output')
-        self.output_combo.currentIndexChanged.connect(self.change_output_device)
-        audio_layout.addWidget(self.output_label)
-        audio_layout.addWidget(self.output_combo)
-
-        # Input devices
-        self.input_label = QLabel("Input Device:")
-        self.input_combo = QComboBox()
-        self.fill_audio_devices(self.input_combo, 'input')
-        self.input_combo.currentIndexChanged.connect(self.change_input_device)
-        audio_layout.addWidget(self.input_label)
-        audio_layout.addWidget(self.input_combo)
-
-        audio_tab.setLayout(audio_layout)
-        self.tabs.addTab(audio_tab, "Audio")
-
-    def fill_audio_devices(self, combo, device_type):
-        p = pyaudio.PyAudio()
-        default_device = p.get_default_host_api_info()['defaultOutputDevice' if device_type == 'output' else 'defaultInputDevice']
-        for i in range(p.get_device_count()):
-            dev = p.get_device_info_by_index(i)
-            if (device_type == 'output' and dev['maxOutputChannels'] > 0) or \
-               (device_type == 'input' and dev['maxInputChannels'] > 0):
-                combo.addItem(dev['name'], dev['index'])
-                if dev['index'] == default_device:
-                    combo.setCurrentIndex(combo.count() - 1)
-        p.terminate()
-
-    def change_output_device(self, index):
-        device_index = self.output_combo.currentData()
-        self.config.set('audio_output_device', device_index)
-        QWebEngineSettings.globalSettings().setAttribute(QWebEngineSettings.PlaybackRequiresUserGesture, False)
-        # Note: Setting the actual audio device requires lower-level audio API integration
-
-    def change_input_device(self, index):
-        device_index = self.input_combo.currentData()
-        self.config.set('audio_input_device', device_index)
-        # Note: Setting the actual audio device requires lower-level audio API integration
 
     def init_general_tab(self):
         general_tab = QWidget()
