@@ -6,6 +6,7 @@ class Config:
         self.config_file = 'browser_config.json'
         self.config = self.load_config()
 
+
     def load_config(self):
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r') as f:
@@ -23,6 +24,8 @@ class Config:
             'default_search_engine': "Google",
             'background_color': "#FFFFFF",
             'icon_path': "",
+            'default_download_path': os.path.expanduser("~/Downloads"),
+    
         }
         self.save_config(default_config)
         return default_config
