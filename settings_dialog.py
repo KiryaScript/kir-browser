@@ -1,4 +1,3 @@
-import pyaudio
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QLabel, 
                              QListWidget, QInputDialog, QColorDialog, QFileDialog, QTabWidget, QWidget)
 from PyQt5.QtCore import Qt
