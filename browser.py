@@ -1,9 +1,9 @@
 import os
-from PyQt5.QtCore import QUrl, Qt
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
+from PyQt5.QtCore import QUrl, Qt, QTimer
+from PyQt5.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
                              QProgressBar)
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings, QWebEnginePage
-from PyQt5.QtGui import QIcon, QPalette, QColor
+from PyQt5.QtGui import QIcon, QPalette, QColor, QPixmap
 from settings_dialog import SettingsDialog
 from urllib.parse import quote, urlparse
 
@@ -26,10 +26,28 @@ def navigate(self):
 
     self.tabs.currentWidget().setUrl(QUrl(url))
 
+class Dinosaur(QLabel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setPixmap(QPixmap("dino.png"))
+        self.setGeometry(10, parent.height() - 50, 40, 40)
+        self.x_pos = 10
+        
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.move)
+        self.timer.start(50)
+    
+    def move(self):
+        self.x_pos += 5
+        if self.x_pos > self.parent().width():
+            self.x_pos = -40
+        self.setGeometry(self.x_pos, self.y(), 40, 40)
+
 class SimpleBrowser(QWidget):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.dino = Dinosaur(self)
         self.profile = QWebEngineProfile.defaultProfile()
         self.search_engines = self.config.get('search_engines', {
             "Google": "https://www.google.com/search?q={}",
@@ -169,3 +187,4 @@ class SimpleBrowser(QWidget):
         icon_path = self.config.get('icon_path')
         if icon_path and os.path.exists(icon_path):
             self.set_icon(icon_path)
+
