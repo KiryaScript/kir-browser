@@ -1,2 +1,5 @@
 PyQt5
-PyQtWebEngine
+PyQtWebEngine 
+pygame
+math
+random
