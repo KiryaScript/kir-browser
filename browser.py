@@ -73,7 +73,7 @@ class SimpleBrowser(QWidget):
         self.tabs.setCornerWidget(self.add_tab_button, Qt.TopLeftCorner)
 
         self.url_bar = QLineEdit()
-        self.url_bar.setPlaceholderText('Enter URL or search query')
+        self.url_bar.setPlaceholderText('Введите URL-адрес или поисковый запрос')
         go_btn = QPushButton('Поиск')
         go_btn.clicked.connect(self.navigate)
 
@@ -101,6 +101,7 @@ class SimpleBrowser(QWidget):
         self.current_search_engine = self.config.get('default_search_engine')
 
         # тут можно замаскировать браузер\систему под другой любой
+        # You can disguise your browser system as any other browser.
         self.profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
         
@@ -115,7 +116,7 @@ class SimpleBrowser(QWidget):
         new_tab.settings().setAttribute(QWebEngineSettings.PluginsEnabled, True)
         new_tab.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
         
-        index = self.tabs.addTab(new_tab, "Новая")
+        index = self.tabs.addTab(new_tab, "Новая вкладка")
         self.tabs.setCurrentIndex(index)
         new_tab.urlChanged.connect(lambda qurl, browser=new_tab: self.update_url(qurl, browser))
         new_tab.loadProgress.connect(self.update_progress)
@@ -134,7 +135,7 @@ class SimpleBrowser(QWidget):
     def navigate(self):
         query = self.url_bar.text()
         if not query.startswith(('http://', 'https://')):
-            if ' ' in query:  # If there's a space, assume it's a search query
+            if ' ' in query:
                 url = self.search_engines[self.current_search_engine].format(query)
             else:
                 url = 'http://' + query

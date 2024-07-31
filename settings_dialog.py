@@ -8,7 +8,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.parent = parent
         self.config = config
-        self.setWindowTitle("Settings")
+        self.setWindowTitle("Настройки")
         self.setWindowFlags(self.windowFlags() | Qt.WindowSystemMenuHint | Qt.WindowMinMaxButtonsHint)
         
         self.layout = QVBoxLayout()
@@ -25,17 +25,17 @@ class SettingsDialog(QDialog):
         general_layout = QVBoxLayout()
 
         # Color picker
-        self.color_btn = QPushButton("Choose background color")
+        self.color_btn = QPushButton("Изменить цвет окна")
         self.color_btn.clicked.connect(self.choose_color)
         general_layout.addWidget(self.color_btn)
 
         # Icon picker
-        self.icon_btn = QPushButton("Choose icon")
+        self.icon_btn = QPushButton("Изменить иконку")
         self.icon_btn.clicked.connect(self.choose_icon)
         general_layout.addWidget(self.icon_btn)
 
         # Search engine selector
-        self.search_label = QLabel("Default search engine:")
+        self.search_label = QLabel("ЛУЧШЕ НЕ ЖМИ:")
         self.search_combo = QComboBox()
         
         if hasattr(self.parent, 'search_engines') and self.parent.search_engines is not None:
@@ -49,7 +49,7 @@ class SettingsDialog(QDialog):
         general_layout.addWidget(self.search_combo)
 
         # Add new search engine
-        self.add_search_btn = QPushButton("Add new search engine")
+        self.add_search_btn = QPushButton("Добавить поисковую систему(НЕ НАЖИМАЙ)")
         self.add_search_btn.clicked.connect(self.add_search_engine)
         general_layout.addWidget(self.add_search_btn)
 
@@ -92,4 +92,6 @@ class SettingsDialog(QDialog):
         if filename:
             # Здесь я бы реализовал логику для добавления и включения расширения
             # Это заглушка, так как реализация поддержки расширений браузера - пиздец сложная задача
+            # Here I would implement the logic for adding and enabling extensions.
+            # This is a stub, because implementing browser extension support is a fucking difficult task.
             self.extensions_list.addItem(filename)
