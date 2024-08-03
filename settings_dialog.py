@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QCo
                              QListWidget, QInputDialog, QColorDialog, QFileDialog, QTabWidget, QWidget)
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineSettings
+import subprocess
 
 class SettingsDialog(QDialog):
     def __init__(self, parent, config):
@@ -23,6 +24,14 @@ class SettingsDialog(QDialog):
     def init_general_tab(self):
         general_tab = QWidget()
         general_layout = QVBoxLayout()
+
+        # Добавляем новую кнопку для запуска игры
+        self.game_btn = QPushButton("Запустить игру")
+        self.game_btn.clicked.connect(self.launch_game)
+        general_layout.addWidget(self.game_btn)
+
+        general_tab.setLayout(general_layout)
+        self.tabs.addTab(general_tab, "General")
 
         # Color picker
         self.color_btn = QPushButton("Изменить цвет окна")
@@ -55,6 +64,12 @@ class SettingsDialog(QDialog):
 
         general_tab.setLayout(general_layout)
         self.tabs.addTab(general_tab, "General")
+
+    def launch_game(self):
+        try:
+            subprocess.Popen(["python", "game.py"])
+        except Exception as e:
+            print(f"Ошибка при запуске игры: {e}")
 
     def init_extensions_tab(self):
         extensions_tab = QWidget()
