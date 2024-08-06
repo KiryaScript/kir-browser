@@ -2,7 +2,7 @@ import pygame
 import math
 import random
 from pygame.math import Vector3
-
+#im gay)))
 pygame.init()
 
 WIDTH = 800
