@@ -3,3 +3,5 @@ PyQtWebEngine
 pygame
 math
 random
+SpeechRecognition
+pyaudio

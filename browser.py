@@ -1,53 +1,17 @@
 import os
+import speech_recognition as sr
 from PyQt5.QtCore import QUrl, Qt, QTimer
-from PyQt5.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
-                             QProgressBar)
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
+                             QProgressBar, QMessageBox, QApplication, QComboBox, QLabel)
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings, QWebEnginePage
-from PyQt5.QtGui import QIcon, QPalette, QColor, QPixmap
+from PyQt5.QtGui import QIcon, QPalette, QColor
 from settings_dialog import SettingsDialog
 from urllib.parse import quote, urlparse
-
-def navigate(self):
-    query = self.url_bar.text()
-    
-    
-    parsed = urlparse(query)
-    if parsed.scheme and parsed.netloc:
-        url = query
-    else:
-        
-        if ' ' in query:
-            
-            encoded_query = quote(query)
-            url = self.search_engines[self.current_search_engine].format(encoded_query)
-        else:
-            
-            url = 'http://' + quote(query)
-
-    self.tabs.currentWidget().setUrl(QUrl(url))
-
-class Dinosaur(QLabel):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setPixmap(QPixmap("dino.png"))
-        self.setGeometry(10, parent.height() - 50, 40, 40)
-        self.x_pos = 10
-        
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.move)
-        self.timer.start(50)
-    
-    def move(self):
-        self.x_pos += 5
-        if self.x_pos > self.parent().width():
-            self.x_pos = -40
-        self.setGeometry(self.x_pos, self.y(), 40, 40)
 
 class SimpleBrowser(QWidget):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.dino = Dinosaur(self)
         self.profile = QWebEngineProfile.defaultProfile()
         self.search_engines = self.config.get('search_engines', {
             "Google": "https://www.google.com/search?q={}",
@@ -55,6 +19,9 @@ class SimpleBrowser(QWidget):
             "DuckDuckGo": "https://duckduckgo.com/?q={}"
         })
         self.current_search_engine = self.config.get('default_search_engine', "Google")
+        self.recognizer = sr.Recognizer()
+        self.microphones = sr.Microphone.list_microphone_names()
+        self.current_microphone = self.config.get('default_microphone', self.microphones[0] if self.microphones else None)
         self.init_ui()
 
     def init_ui(self):
@@ -83,6 +50,21 @@ class SimpleBrowser(QWidget):
         settings_btn = QPushButton('Настройки')
         settings_btn.clicked.connect(self.open_settings)
 
+        voice_btn = QPushButton('🎤')
+        voice_btn.clicked.connect(self.start_voice_input)
+
+        self.mic_selector = QComboBox()
+        self.mic_selector.addItems(self.microphones)
+        if self.current_microphone:
+            self.mic_selector.setCurrentText(self.current_microphone)
+        self.mic_selector.currentTextChanged.connect(self.change_microphone)
+
+        self.voice_label = QLabel("Готов к голосовому вводу")
+
+        toolbar.addWidget(voice_btn)
+        toolbar.addWidget(self.mic_selector)
+        toolbar.addWidget(self.voice_label)
+
         toolbar.addWidget(back_btn)
         toolbar.addWidget(self.url_bar)
         toolbar.addWidget(go_btn)
@@ -97,18 +79,19 @@ class SimpleBrowser(QWidget):
 
         self.setLayout(self.layout)
 
-        self.search_engines = self.config.get('Поисковая система по умолчанию')
-        self.current_search_engine = self.config.get('default_search_engine')
-
-        # тут можно замаскировать браузер\систему под другой любой
-        # You can disguise your browser system as any other browser.
         self.profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-        
         self.profile.setPersistentStoragePath(os.path.join(os.getcwd(), 'browser_data'))
 
         self.apply_saved_settings()
         self.add_tab()
+
+    def change_microphone(self, mic_name):
+        self.current_microphone = mic_name
+        self.config.set('default_microphone', mic_name)
+
+    def start_voice_input(self):
+        self.voice_label.setText("Говорите...")
+        QTimer.singleShot(100, self.voice_input)
 
     def add_tab(self, url=""):
         new_tab = QWebEngineView()
@@ -134,13 +117,15 @@ class SimpleBrowser(QWidget):
 
     def navigate(self):
         query = self.url_bar.text()
-        if not query.startswith(('http://', 'https://')):
-            if ' ' in query:
-                url = self.search_engines[self.current_search_engine].format(query)
-            else:
-                url = 'http://' + query
-        else:
+        parsed = urlparse(query)
+        if parsed.scheme and parsed.netloc:
             url = query
+        else:
+            if ' ' in query:
+                encoded_query = quote(query)
+                url = self.search_engines[self.current_search_engine].format(encoded_query)
+            else:
+                url = 'http://' + quote(query)
         self.tabs.currentWidget().setUrl(QUrl(url))
 
     def update_url(self, q, browser):
@@ -189,3 +174,19 @@ class SimpleBrowser(QWidget):
         if icon_path and os.path.exists(icon_path):
             self.set_icon(icon_path)
 
+    def voice_input(self):
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            QMessageBox.information(self, "Голосовой ввод", "Говорите сейчас...")
+            try:
+                audio = recognizer.listen(source, timeout=5)
+                QMessageBox.information(self, "Голосовой ввод", "Обработка речи...")
+                text = recognizer.recognize_google(audio, language="ru-RU")
+                self.url_bar.setText(text)
+                self.navigate()
+            except sr.WaitTimeoutError:
+                QMessageBox.warning(self, "Ошибка", "Время ожидания истекло. Попробуйте еще раз.")
+            except sr.UnknownValueError:
+                QMessageBox.warning(self, "Ошибка", "Не удалось распознать речь")
+            except sr.RequestError as e:
+                QMessageBox.warning(self, "Ошибка", f"Ошибка сервиса распознавания речи: {e}")
