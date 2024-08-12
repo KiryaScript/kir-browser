@@ -173,20 +173,26 @@ class SimpleBrowser(QWidget):
         icon_path = self.config.get('icon_path')
         if icon_path and os.path.exists(icon_path):
             self.set_icon(icon_path)
+        
+        default_mic = self.config.get('default_microphone')
+        if default_mic and default_mic in self.microphones:
+            self.mic_selector.setCurrentText(default_mic)
 
     def voice_input(self):
-        recognizer = sr.Recognizer()
-        with sr.Microphone() as source:
-            QMessageBox.information(self, "Голосовой ввод", "Говорите сейчас...")
-            try:
-                audio = recognizer.listen(source, timeout=5)
-                QMessageBox.information(self, "Голосовой ввод", "Обработка речи...")
-                text = recognizer.recognize_google(audio, language="ru-RU")
+        try:
+            with sr.Microphone(device_index=self.microphones.index(self.current_microphone)) as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
+                self.voice_label.setText("Обработка речи...")
+                text = self.recognizer.recognize_google(audio, language="ru-RU")
                 self.url_bar.setText(text)
                 self.navigate()
-            except sr.WaitTimeoutError:
-                QMessageBox.warning(self, "Ошибка", "Время ожидания истекло. Попробуйте еще раз.")
-            except sr.UnknownValueError:
-                QMessageBox.warning(self, "Ошибка", "Не удалось распознать речь")
-            except sr.RequestError as e:
-                QMessageBox.warning(self, "Ошибка", f"Ошибка сервиса распознавания речи: {e}")
+                self.voice_label.setText("Готов к голосовому вводу")
+        except sr.WaitTimeoutError:
+            self.voice_label.setText("Время ожидания истекло. Попробуйте еще раз.")
+        except sr.UnknownValueError:
+            self.voice_label.setText("Не удалось распознать речь")
+        except sr.RequestError as e:
+            self.voice_label.setText(f"Ошибка сервиса распознавания речи: {e}")
+        finally:
+            QTimer.singleShot(3000, lambda: self.voice_label.setText("Готов к голосовому вводу"))
