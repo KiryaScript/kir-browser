@@ -1,18 +1,38 @@
 import os
 import speech_recognition as sr
-from PyQt5.QtCore import QUrl, Qt, QTimer
+from PyQt5.QtCore import QUrl, Qt, QTimer, QFileInfo
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
-                             QProgressBar, QMessageBox, QApplication, QComboBox, QLabel)
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings, QWebEnginePage
+                             QProgressBar, QMessageBox, QApplication, QComboBox, QLabel, QFileDialog)
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings, QWebEnginePage, QWebEngineDownloadItem
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from settings_dialog import SettingsDialog
 from urllib.parse import quote, urlparse
+
+class DownloadManager:
+    def __init__(self, parent=None):
+        self.parent = parent
+
+    def handle_download(self, download):
+        old_path = download.path()
+        suffix = QFileInfo(old_path).suffix()
+        path, _ = QFileDialog.getSaveFileName(self.parent, "Save File", old_path, f"*.{suffix}")
+        if path:
+            download.setPath(path)
+            download.accept()
+            download.finished.connect(self.download_finished)
+        else:
+            download.cancel()
+
+    def download_finished(self):
+        QMessageBox.information(self.parent, "Загрузка завершена", "Файл загружен успешно.")
 
 class SimpleBrowser(QWidget):
     def __init__(self, config):
         super().__init__()
         self.config = config
         self.profile = QWebEngineProfile.defaultProfile()
+        self.download_manager = DownloadManager(self)
+        self.profile.downloadRequested.connect(self.download_manager.handle_download)
         self.search_engines = self.config.get('search_engines', {
             "Google": "https://www.google.com/search?q={}",
             "Bing": "https://www.bing.com/search?q={}",
@@ -43,6 +63,10 @@ class SimpleBrowser(QWidget):
         self.url_bar.setPlaceholderText('Введите URL-адрес или поисковый запрос')
         go_btn = QPushButton('Поиск')
         go_btn.clicked.connect(self.navigate)
+
+        downloads_btn = QPushButton('Загрузки')
+        downloads_btn.clicked.connect(self.show_downloads)
+        toolbar.addWidget(downloads_btn)
 
         back_btn = QPushButton('Назад')
         back_btn.clicked.connect(self.go_back)
@@ -98,7 +122,13 @@ class SimpleBrowser(QWidget):
         new_tab.setPage(QWebEnginePage(self.profile, new_tab))
         new_tab.settings().setAttribute(QWebEngineSettings.PluginsEnabled, True)
         new_tab.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
-        
+        new_tab.settings().setAttribute(QWebEngineSettings.PluginsEnabled, True)
+        new_tab.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+        new_tab.settings().setAttribute(QWebEngineSettings.AutoLoadImages, True)
+        new_tab.settings().setAttribute(QWebEngineSettings.JavascriptCanOpenWindows, True)
+        new_tab.settings().setAttribute(QWebEngineSettings.JavascriptCanAccessClipboard, True)
+        new_tab.settings().setAttribute(QWebEngineSettings.LocalStorageEnabled, True)
+
         index = self.tabs.addTab(new_tab, "Новая вкладка")
         self.tabs.setCurrentIndex(index)
         new_tab.urlChanged.connect(lambda qurl, browser=new_tab: self.update_url(qurl, browser))
@@ -108,6 +138,10 @@ class SimpleBrowser(QWidget):
             new_tab.setUrl(QUrl(url))
         else:
             new_tab.setUrl(QUrl("https://www.google.com"))
+
+    def show_downloads(self):
+    # Здесь вы можете добавить логику для отображения списка загрузок
+        QMessageBox.information(self, "Загрузки", "Downloads feature is not yet implemented.")
 
     def close_tab(self, index):
         if self.tabs.count() > 1:
