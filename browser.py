@@ -2,11 +2,14 @@ import os
 import speech_recognition as sr
 from PyQt5.QtCore import QUrl, Qt, QTimer, QFileInfo
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QTabWidget, 
-                             QProgressBar, QMessageBox, QApplication, QComboBox, QLabel, QFileDialog)
+                             QProgressBar, QMessageBox, QApplication, QComboBox, QLabel, QFileDialog, QMenu, QTextEdit)
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEngineSettings, QWebEnginePage, QWebEngineDownloadItem
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from settings_dialog import SettingsDialog
 from urllib.parse import quote, urlparse
+import time
+from bs4 import BeautifulSoup
+import requests
 
 class DownloadManager:
     def __init__(self, parent=None):
@@ -54,6 +57,10 @@ class SimpleBrowser(QWidget):
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
+
+        dev_tools_btn = QPushButton('Dev Tools')
+        dev_tools_btn.clicked.connect(self.toggle_dev_tools)
+        toolbar.addWidget(dev_tools_btn)
 
         self.add_tab_button = QPushButton('+')
         self.add_tab_button.clicked.connect(self.add_tab)
@@ -109,6 +116,69 @@ class SimpleBrowser(QWidget):
         self.apply_saved_settings()
         self.add_tab()
 
+    def toggle_dev_tools(self):
+        current_tab = self.tabs.currentWidget()
+        if current_tab:
+            dev_tools_page = QWebEnginePage(self.profile, self)
+            current_tab.page().setDevToolsPage(dev_tools_page)
+        
+            dev_tools_view = QWebEngineView()
+            dev_tools_view.setPage(dev_tools_page)
+            dev_tools_view.setWindowTitle("Developer Tools")
+            dev_tools_view.resize(800, 600)
+            dev_tools_view.show()
+
+    def view_source(self):
+        current_tab = self.tabs.currentWidget()
+        if current_tab:
+            url = current_tab.url().toString()
+            response = requests.get(url)
+            source_code = response.text
+            self.show_source_code(source_code)
+
+    def show_source_code(self, source_code):
+        source_window = QWidget()
+        source_window.setWindowTitle("Source Code")
+        source_layout = QVBoxLayout()
+        source_text = QTextEdit()
+        source_text.setPlainText(source_code)
+        source_layout.addWidget(source_text)
+        source_window.setLayout(source_layout)
+        source_window.resize(800, 600)
+        source_window.show()
+
+    def inspect_element(self):
+        current_tab = self.tabs.currentWidget()
+        if current_tab:
+            current_tab.page().runJavaScript("""
+                function getElementInfo(element) {
+                    return {
+                        tagName: element.tagName,
+                        id: element.id,
+                        className: element.className,
+                        innerText: element.innerText
+                    };
+                }
+                
+                document.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log(JSON.stringify(getElementInfo(e.target)));
+                }, true);
+            """)
+
+    def start_performance_analysis(self):
+        current_tab = self.tabs.currentWidget()
+        if current_tab:
+            current_tab.page().loadStarted.connect(self.performance_load_started)
+            current_tab.page().loadFinished.connect(self.performance_load_finished)
+
+    def performance_load_started(self):
+        self.load_start_time = time.time()
+
+    def performance_load_finished(self):
+        load_time = time.time() - self.load_start_time
+        print(f"Page loaded in {load_time:.2f} seconds")
+
     def change_microphone(self, mic_name):
         self.current_microphone = mic_name
         self.config.set('default_microphone', mic_name)
@@ -129,6 +199,10 @@ class SimpleBrowser(QWidget):
         new_tab.settings().setAttribute(QWebEngineSettings.JavascriptCanAccessClipboard, True)
         new_tab.settings().setAttribute(QWebEngineSettings.LocalStorageEnabled, True)
 
+        # Добавьте контекстное меню
+        new_tab.setContextMenuPolicy(Qt.CustomContextMenu)
+        new_tab.customContextMenuRequested.connect(self.show_context_menu)
+
         index = self.tabs.addTab(new_tab, "Новая вкладка")
         self.tabs.setCurrentIndex(index)
         new_tab.urlChanged.connect(lambda qurl, browser=new_tab: self.update_url(qurl, browser))
@@ -138,6 +212,20 @@ class SimpleBrowser(QWidget):
             new_tab.setUrl(QUrl(url))
         else:
             new_tab.setUrl(QUrl("https://www.google.com"))
+
+    def show_context_menu(self, pos):
+        context_menu = QMenu(self)
+        view_source_action = context_menu.addAction("View Source")
+        inspect_element_action = context_menu.addAction("Inspect Element")
+        performance_analysis_action = context_menu.addAction("Start Performance Analysis")
+
+        action = context_menu.exec_(self.mapToGlobal(pos))
+        if action == view_source_action:
+            self.view_source()
+        elif action == inspect_element_action:
+            self.inspect_element()
+        elif action == performance_analysis_action:
+            self.start_performance_analysis()
 
     def show_downloads(self):
     # Здесь вы можете добавить логику для отображения списка загрузок
